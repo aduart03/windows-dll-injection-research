@@ -1,69 +1,138 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <iostream>
-#include <string> // for std::string and std::cout
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <cstring>
+#include <fstream>
+#pragma comment(lib, "Advapi32.lib")
+
+struct ProcessMatch {
+    DWORD pid;
+    std::string name;
+};
+
+struct AccessTest {
+    DWORD mask;
+    const char* label;
+};
+
+bool IsRunningAsAdmin() {
+    BOOL isAdmin = FALSE;
+    PSID adminGroup = NULL;
+
+    SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
+
+    if (AllocateAndInitializeSid(
+            &ntAuthority,
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0,
+            &adminGroup)) {
+
+        CheckTokenMembership(NULL, adminGroup, &isAdmin);
+        FreeSid(adminGroup);
+    }
+
+    return isAdmin == TRUE;
+}
+
+const char* ErrorToString(DWORD err) {
+    switch (err) {
+        case 5: return "Access denied";
+        case 87: return "Invalid parameter";
+        default: return "Unknown error";
+    }
+}
+
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
-        std::cout << "Usage : processs_enum.exe <process_name>\n";
+        std::cout << "Usage: process_enum.exe <process_name>\n";
         return 1;
     }
 
     std::string target = argv[1];
-    DWORD targetPID = 0;
+    std::cout << "Running as admin: " << (IsRunningAsAdmin() ? "YES" : "NO") << "\n\n";
+    std::vector<ProcessMatch> matches;
 
-    // Snapshot processes in the system
+    std::ofstream logFile("..\\logs\\injection_results.txt", std::ios::app);
+
+    if (!logFile) {
+        std::cout << "Warning: could not open log file for writing.\n";
+    }
+
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create snapshot. Error: \n" << GetLastError() << std::endl;
+        std::cout << "Failed to create snapshot. Error: " << GetLastError() << std::endl;
         return 1;
     }
 
-    PROCESSENTRY32 process{};   // Initialize the PROCESSENTRY32 structure
+    PROCESSENTRY32 process{};
     process.dwSize = sizeof(PROCESSENTRY32);
 
-    // Iterate through the processes and print their IDs and names
     if (Process32First(snapshot, &process)) {
-
-        // Check if the process name matches the target
-        if (!Process32First(snapshot, &process)) {
-        std::cout << "Failed to enumerate processes. Error: " << GetLastError() << std::endl;
-        }
-
-        // Iterate through the processes and check for the target process
         do {
             std::string exeName = process.szExeFile;
-            if (exeName == target) {
-                targetPID = process.th32ProcessID;
-                std::cout << "Found target process: " << exeName << " | PID: " << targetPID << std::endl;
-                break;
+
+            if (_stricmp(exeName.c_str(), target.c_str()) == 0) {
+                matches.push_back({ process.th32ProcessID, exeName });
             }
 
         } while (Process32Next(snapshot, &process));
     } else {
-        std::cout << "Failed to enumerate processes. Error \n" << GetLastError() << std::endl;
+        std::cout << "Failed to enumerate processes. Error: " << GetLastError() << std::endl;
+        CloseHandle(snapshot);
+        return 1;
     }
 
-    // Close the snapshot handle
     CloseHandle(snapshot);
 
-    if (targetPID == 0) {
+    if (matches.empty()) {
         std::cout << "Target process not found.\n";
         return 1;
     }
 
-    std::cout << "Found target PID: " << targetPID << "\n";
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, targetPID);
-    if (hProcess == NULL) {
-        std::cout << "OpenProcess failed. Error: " << GetLastError() << "\n";
-        return 1;
+    std::cout << "Found " << matches.size() << " matching process(es) for: " << target << "\n\n";
+    if (logFile) {
+        logFile << "Found " << matches.size() << " matching process(es) for: " << target << "\n\n";
     }
 
-    std::cout << "OpenProcess succeeded for PID " << targetPID << "\n";
-    CloseHandle(hProcess);
+    AccessTest tests[] = {
+        { PROCESS_QUERY_INFORMATION, "PROCESS_QUERY_INFORMATION" },
+        { PROCESS_VM_READ, "PROCESS_VM_READ" },
+        { PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, "QUERY_INFORMATION | VM_READ" },
+        { PROCESS_VM_OPERATION, "PROCESS_VM_OPERATION" },
+        { PROCESS_VM_WRITE, "PROCESS_VM_WRITE" },
+        { PROCESS_CREATE_THREAD, "PROCESS_CREATE_THREAD" }
+    };
 
+    for (const auto& match : matches) {
+        std::cout << "========================================\n";
+        std::cout << "Process: " << match.name << "\n";
+        std::cout << "PID:     " << match.pid << "\n";
+        std::cout << "----------------------------------------\n";
 
+        for (const auto& test : tests) {
+            SetLastError(0);
+            HANDLE hProcess = OpenProcess(test.mask, FALSE, match.pid);
+
+            std::cout << std::left << std::setw(35) << test.label;
+
+            if (hProcess != NULL) {
+                std::cout << "SUCCESS\n";
+                CloseHandle(hProcess);
+            } else {
+                DWORD err = GetLastError();
+                std::cout << "FAILED (Error: " << err << " - " << ErrorToString(err) << ")\n";
+            }
+        }
+
+        std::cout << std::endl;
+    }
 
     return 0;
 }
+

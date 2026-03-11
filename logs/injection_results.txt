@@ -1,0 +1,12 @@
+Implemented a Win32 process access analyzer in C++ that enumerates processes,
+identifies matching PIDs, and tests multiple OpenProcess access rights against live targets,
+reporting success/failure per mask.Found 1 matching process(es) for: notepad.exe
+
+Found 1 matching process(es) for: explorer.exe
+
+Found 1 matching process(es) for: lsass.exe
+
+Found 1 matching process(es) for: winlogon.exe
+
+Found 1 matching process(es) for: services.exe
+
