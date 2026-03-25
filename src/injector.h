@@ -1,9 +1,13 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <windows.h>
 
-#include "access_check.h"
+struct InjectionResult {
+    DWORD pid;
+    std::string dll_path;
+    bool success;
+    std::string message;
+};
 
-void print_access_result(const AccessCheckResult& result);
-void append_access_result_to_log(const AccessCheckResult& result, const std::string& log_path);
+InjectionResult inject_dll(DWORD pid, const std::string& dll_path);

@@ -1,3 +1,4 @@
+#include <windows.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -7,6 +8,26 @@
 #include "logger.h"
 
 int main(int argc, char* argv[]) {
+    std::string dll_path = "..\\payload\\payload.dll"; // adjust if needed
+
+    std::cout << "DLL path: " << dll_path << "\n";
+
+    DWORD attrs = GetFileAttributesA(dll_path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        std::cout << "DLL file NOT FOUND.\n";
+    } else {
+        std::cout << "DLL file exists.\n";
+    }
+
+    HMODULE mod = LoadLibraryA(dll_path.c_str());
+    if (!mod) {
+        std::cout << "Failed to load DLL: " << GetLastError() << "\n";
+        return 1;
+    }
+
+    std::cout << "DLL loaded successfully.\n";
+    FreeLibrary(mod);
+
     std::vector<ProcessMatch> processes;
     bool all_mode = false;
 
@@ -36,7 +57,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string txt_log_path = "..\\logs\\injection_results.txt";
+    std::string txt_log_path = "..\\logs\\access_results.txt";
     std::string csv_log_path = "..\\logs\\access_results.csv";
 
     write_csv_header_if_needed(csv_log_path);

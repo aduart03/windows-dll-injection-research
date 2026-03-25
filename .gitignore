@@ -1,7 +1,15 @@
-*.exe
+.vs/
+**/.vs/
+.vscode/
 *.obj
 *.pdb
 *.ilk
 *.lib
 *.exp
-.vscode/
+*.dll
+*.exe
+x64/
+Debug/
+Release/
+logs/*.txt
+logs/*.csv
