@@ -1,13 +1,21 @@
-Milestone 2 – Process Access Analysis
+# Windows Process Access Research
 
-Implemented a Windows C++ tool that:
+This project studies Windows process visibility, access rights, and user/kernel boundary behavior through controlled research components.
 
-• Enumerates running processes using ToolHelp32
-• Matches target processes by executable name
-• Supports multiple instances of the same executable
-• Tests several OpenProcess access rights
-• Reports success/failure and Win32 error codes
-• Detects whether the program is running with admin privileges
+## Current status
+- Milestone 1: process enumeration
+- Milestone 2: access-right analysis with OpenProcess
+- Payload source included for controlled local testing
+- Logging of success/failure and Win32 error codes
 
-Initial experiments show that user-level processes allow requested
-access rights while system-critical processes return ERROR_ACCESS_DENIED.
+## Repository structure
+- `src/` – user-mode source code
+- `payload/` – test DLL source
+- `logs/` – experiment outputs
+- `docs/` – methodology and notes
+
+## Build
+Explain how to build the main tool and the payload DLL.
+
+## Notes
+Compiled binaries are not tracked as source artifacts; build locally from the included code.
